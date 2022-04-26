@@ -1,0 +1,135 @@
+#define F_CPU 8000000L
+#include "Robot.h"
+#include "Can.h"
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <avr/io.h>
+
+Robot::Robot() {
+    led_ = Led();
+    photoResistance_ = PhotoResistance();
+    motors_ = Motors();
+    cd_ = CapteurDistance();
+}
+
+void Robot::followLight() {
+    Uart uart = Uart();
+    motors_.stopMotors();
+    PhotoResistance photo = PhotoResistance();
+    //_delay_ms(2000);
+    Can readCan;
+    while (true) {
+
+        uint8_t rightRead = photo.readValue(6);
+        uint8_t leftRead = photo.readValue(7);
+        // uart.transmettreByte(rightRead);
+        
+        //uint8_t percentageRight = double((rightRead/photoResistance_.getRight()) * 100) - 100;
+        uint8_t percentageRight = ((double(rightRead)/photoResistance_.getRight()) * 100);
+        uint8_t percentageLeft = ((double(leftRead)/photoResistance_.getLeft()) * 100);
+        //174/140 * 100 = 124 - 100 = 24
+        // uart.transmettreByte(rightRead);
+        // uart.transmettreByte(photoResistance_.getRight());
+        // uart.transmettreByte(percentageRight);
+        uart.transmettreByte(leftRead);
+        uart.transmettreByte(photoResistance_.getLeft());
+        uart.transmettreByte(percentageLeft);
+        //_delay_ms(1000);
+        percentageRight = (percentageRight < 110) ? 100 : percentageRight;
+        percentageLeft = (percentageLeft < 110) ? 100 : percentageLeft;
+
+        if (percentageRight > 110) {
+            motors_.moveForwardRight(155 + percentageRight - 100);
+        }
+
+        if (percentageLeft > 110) {
+            motors_.moveForwardLeft(155 + percentageLeft - 100);
+        }
+
+        if (percentageRight <= 110 && percentageLeft <= 110) {
+            motors_.stopMotors();
+        }
+    }
+}
+    
+
+    void Robot::initISR() {
+        cli();
+        DDRD |= 0x00;
+        DDRB |= (1 << PORTB1) | (1 << PORTB0);
+
+        EIMSK |= (1 << INT0);
+        EICRA |= (1 << ISC01);
+    
+        sei();
+    }
+
+    void Robot::followWall() {
+        _delay_ms(10);
+        if(detectWall()){
+            motors_.setVelocity(200,200);
+
+            if(cd_.lectureDistance() <= 21 && cd_.lectureDistance() >= 25)
+            { 
+                _delay_ms(50);
+                motors_.setVelocity(200, 170);
+            };
+            
+            if(cd_.lectureDistance() >= 16 && cd_.lectureDistance() >= 19)
+            { 
+                _delay_ms(50);
+                motors_.setVelocity(170, 200);
+            }
+
+        }
+        else 
+            motors_.stopMotors();
+
+      
+    }
+
+    bool Robot::detectWall(){
+        if(cd_.lectureDistance() <= 25 && cd_.lectureDistance() >= 15)
+            return true;
+        return false;
+    }
+
+    void Robot::makeUTurn(){
+        while(!detectWall())
+        {
+            //setAmbre();
+            motors_.setVelocity(160,200);
+            _delay_ms(2000);
+        }
+
+    }
+
+    BoutonPoussoir Robot::getBouton(){
+        return boutonBlanc_;
+
+    }
+
+    PhotoResistance Robot::getPhoto(){
+        return photoResistance_;
+    }
+
+    // void Robot::setAmbre(){}
+
+
+    // void Robot::setGreen(){}
+
+    // void Robot::setRed(){}
+
+    // void Robot::blinkRed(){}
+
+    // void Robot::blinkGreen(){}
+
+    // void Robot::blinkAmbre(){}
+
+
+
+    // motors_.setVelocity(-255, -255);
+    // _delay_ms(2000);
+    // motors_.stopMotors();
+    
+
